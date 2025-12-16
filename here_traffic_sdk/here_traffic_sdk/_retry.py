@@ -2,6 +2,9 @@
 HTTP retry helpers (rate limiting / transient errors).
 
 Internal module: not part of the public API.
+
+Note: RetryConfig is defined in http.py to avoid circular imports.
+This module provides get_with_retries() for standalone retry logic.
 """
 
 from __future__ import annotations
@@ -15,6 +18,8 @@ from typing import Mapping, Optional, Sequence
 import requests
 
 
+# Duplicate RetryConfig definition to avoid circular import with http.py
+# This matches the definition in http.py exactly
 @dataclass(frozen=True)
 class RetryConfig:
     """
