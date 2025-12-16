@@ -3,11 +3,11 @@ Main client for HERE Traffic API
 Provides unified interface for all API versions
 """
 
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 import logging
 import requests
 from .auth import AuthClient, AuthMethod
-from .http import HttpConfig, TimeoutType, VerifyType
+from .http import HttpConfig, RetryConfig, TimeoutType, VerifyType
 from .v7 import TrafficAPIv7
 from .v6 import TrafficAPIv6
 from .v3 import TrafficAPIv3
@@ -32,6 +32,11 @@ class HereTrafficClient:
         enable_logging: bool = False,
         logger: Optional[logging.Logger] = None,
         request_id_factory: Optional[Callable[[], str]] = None,
+        max_retries: int = 3,
+        backoff_factor: float = 0.5,
+        max_backoff: float = 8.0,
+        retry_statuses: Sequence[int] = (429, 500, 502, 503, 504),
+        retry_config: Optional[RetryConfig] = None,
     ):
         """
         Initialize HERE Traffic API client
@@ -54,12 +59,20 @@ class HereTrafficClient:
             ... )
         """
         base = HttpConfig()
+        retry_cfg = retry_config or RetryConfig(
+            max_retries=max_retries,
+            timeout=float(timeout) if isinstance(timeout, (int, float)) else 30.0,
+            backoff_factor=backoff_factor,
+            max_backoff=max_backoff,
+            retry_statuses=tuple(retry_statuses),
+        )
         self.http_config = HttpConfig(
             timeout=timeout,
             verify=verify_ssl,
             enable_logging=enable_logging,
             request_id_factory=request_id_factory or base.request_id_factory,
             logger=logger or base.logger,
+            retry_config=retry_cfg,
         )
 
         self.auth_client = AuthClient(
