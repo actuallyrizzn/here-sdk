@@ -3,11 +3,12 @@ HERE Traffic API v3 Client
 Legacy version maintained for backward compatibility
 """
 
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 import requests
 from .auth import AuthClient
 from . import constants
 from .exceptions import raise_for_status_with_context
+from .http import HttpConfig, get_json
 from .models import TrafficFlowResponse
 
 
@@ -21,7 +22,13 @@ class TrafficAPIv3:
     
     BASE_URL = constants.BASE_URL_V3
     
-    def __init__(self, auth_client: AuthClient):
+    def __init__(
+        self,
+        auth_client: AuthClient,
+        *,
+        session: Optional[requests.Session] = None,
+        http_config: Optional[HttpConfig] = None,
+    ):
         """
         Initialize Traffic API v3 client
         
@@ -29,9 +36,22 @@ class TrafficAPIv3:
             auth_client: Authenticated AuthClient instance
         """
         self.auth_client = auth_client
-        self.session = requests.Session()
+        self.session = session or requests.Session()
+        self._owns_session = session is None
+        self.http_config = http_config or HttpConfig()
         # Identify the SDK in outbound requests.
         self.session.headers.update({"User-Agent": constants.DEFAULT_USER_AGENT})
+
+    def close(self):
+        """Close the underlying HTTP session if owned by this client."""
+        if self._owns_session and self.session is not None:
+            self.session.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
     
     def get_flow(
         self,
@@ -55,13 +75,14 @@ class TrafficAPIv3:
         }
         
         headers = self.auth_client.get_auth_headers()
-        
-        response = self.session.get(
-            f"{self.BASE_URL}/flow",
+
+        payload, request_id = get_json(
+            session=self.session,
+            url=f"{self.BASE_URL}/flow",
             params=params,
-            headers=headers
+            headers=headers,
+            config=self.http_config,
         )
-        raise_for_status_with_context(response=response, method="GET", url=f"{self.BASE_URL}/flow")
-        
-        return TrafficFlowResponse(data=response.json(), raw_response=response.json())
+
+        return TrafficFlowResponse(data=payload, raw_response=payload, request_id=request_id)
 

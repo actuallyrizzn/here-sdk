@@ -9,6 +9,7 @@ import requests
 from here_traffic_sdk.auth import AuthClient, AuthMethod
 from here_traffic_sdk import constants
 from here_traffic_sdk.exceptions import HereTrafficHTTPError
+from here_traffic_sdk.http import HttpConfig
 
 
 class TestAuthClient:
@@ -191,4 +192,46 @@ class TestAuthClient:
         assert call_args[1]["data"]["client_secret"] == auth_client_oauth.access_key_secret
         assert call_args[1]["headers"]["Content-Type"] == "application/x-www-form-urlencoded"
         assert call_args[1]["headers"]["User-Agent"] == constants.DEFAULT_USER_AGENT
+        assert call_args[1]["timeout"] == 30.0
+        assert call_args[1]["verify"] is True
+
+    def test_oauth_token_invalid_json_raises_value_error(self, auth_client_oauth, mock_requests_post):
+        """Test OAuth token request invalid JSON raises a helpful ValueError"""
+        mock_response = Mock()
+        mock_response.raise_for_status = Mock()
+        mock_response.json.side_effect = ValueError("bad json")
+        mock_requests_post.return_value = mock_response
+
+        with pytest.raises(ValueError, match="Invalid JSON response from OAuth token endpoint"):
+            auth_client_oauth._get_oauth_token()
+
+    def test_oauth_token_request_logging(self, mock_oauth_credentials, mock_oauth_token_response, mock_requests_post, caplog):
+        """Test optional OAuth token request logging path"""
+        http_config = HttpConfig(
+            enable_logging=True,
+            logger=__import__("logging").getLogger("here_traffic_sdk.http.oauth_test"),
+            request_id_factory=lambda: "rid-oauth",
+        )
+        client = AuthClient(
+            access_key_id=mock_oauth_credentials["access_key_id"],
+            access_key_secret=mock_oauth_credentials["access_key_secret"],
+            auth_method=AuthMethod.OAUTH,
+            http_config=http_config,
+        )
+
+        mock_response = Mock()
+        mock_response.raise_for_status = Mock()
+        mock_response.json.return_value = mock_oauth_token_response
+        mock_requests_post.return_value = mock_response
+
+        with caplog.at_level(__import__("logging").DEBUG, logger="here_traffic_sdk.http.oauth_test"):
+            token = client._get_oauth_token()
+
+        assert token == mock_oauth_token_response["access_token"]
+        records = [r for r in caplog.records if r.message == "HERE SDK OAuth token request"]
+        assert len(records) == 1
+        rec = records[0]
+        assert rec.method == "POST"
+        assert rec.url == AuthClient.OAUTH_TOKEN_URL
+        assert rec.headers["Content-Type"] == "application/x-www-form-urlencoded"
 
