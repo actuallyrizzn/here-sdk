@@ -18,6 +18,7 @@ class TestTrafficAPIv7:
         assert client.auth_client == auth_client_api_key
         assert client.BASE_URL == "https://data.traffic.hereapi.com/v7"
         assert client.session is not None
+        assert client.http_config is not None
     
     def test_get_flow(self, auth_client_api_key, mock_flow_response, mock_requests_session):
         """Test get_flow method"""
@@ -33,12 +34,16 @@ class TestTrafficAPIv7:
         )
         
         assert result.data == mock_flow_response
+        assert result.request_id is not None
         mock_requests_session.get.assert_called_once()
         call_args = mock_requests_session.get.call_args
         assert "flow" in call_args[0][0]
         assert call_args[1]["params"]["locationReferencing"] == "shape"
         assert call_args[1]["params"]["in"] == "circle:51.50643,-0.12719;r=1000"
         assert call_args[1]["params"]["apiKey"] == "test_api_key_12345"
+        assert "X-Request-Id" in call_args[1]["headers"]
+        assert call_args[1]["timeout"] == 30.0
+        assert call_args[1]["verify"] is True
     
     def test_get_flow_with_oauth(self, auth_client_oauth, mock_flow_response, mock_oauth_token_response, mock_requests_session, mock_requests_post):
         """Test get_flow with OAuth authentication"""
@@ -62,6 +67,20 @@ class TestTrafficAPIv7:
         
         assert result.data == mock_flow_response
         assert "Authorization" in mock_requests_session.get.call_args[1]["headers"]
+
+    def test_close_closes_owned_session(self, auth_client_api_key, mock_requests_session):
+        """Test close() closes session when owned"""
+        mock_requests_session.close.reset_mock()
+        client = TrafficAPIv7(auth_client_api_key)
+        client.close()
+        mock_requests_session.close.assert_called_once()
+
+    def test_context_manager_closes_owned_session(self, auth_client_api_key, mock_requests_session):
+        """Test context manager closes session when owned"""
+        mock_requests_session.close.reset_mock()
+        with TrafficAPIv7(auth_client_api_key) as client:
+            assert client.session is not None
+        mock_requests_session.close.assert_called_once()
     
     def test_get_flow_with_additional_params(self, auth_client_api_key, mock_flow_response, mock_requests_session):
         """Test get_flow with additional parameters"""

@@ -3,6 +3,7 @@ Unit tests for main client
 """
 
 import pytest
+from unittest.mock import Mock
 from here_traffic_sdk.client import HereTrafficClient
 from here_traffic_sdk.auth import AuthMethod
 
@@ -53,4 +54,31 @@ class TestHereTrafficClient:
         assert client.v7.auth_client == client.auth_client
         assert client.v6.auth_client == client.auth_client
         assert client.v3.auth_client == client.auth_client
+
+    def test_close_closes_shared_session(self, mock_api_key, mock_requests_session):
+        """Test close() closes shared session"""
+        client = HereTrafficClient(api_key=mock_api_key)
+        client.close()
+        mock_requests_session.close.assert_called_once()
+
+    def test_context_manager_closes_shared_session(self, mock_api_key, mock_requests_session):
+        """Test context manager closes shared session on exit"""
+        mock_requests_session.close.reset_mock()
+        with HereTrafficClient(api_key=mock_api_key) as client:
+            assert client.v7 is not None
+        mock_requests_session.close.assert_called_once()
+
+    def test_http_config_propagates_timeout_and_verify(self, mock_api_key, mock_availability_response, mock_requests_session):
+        """Test HereTrafficClient timeout/verify are forwarded to requests"""
+        mock_response = Mock()
+        mock_response.json.return_value = mock_availability_response
+        mock_response.raise_for_status = Mock()
+        mock_requests_session.get.return_value = mock_response
+
+        client = HereTrafficClient(api_key=mock_api_key, timeout=1.5, verify_ssl=False, request_id_factory=lambda: "rid")
+        client.v7.get_availability()
+
+        call_args = mock_requests_session.get.call_args
+        assert call_args[1]["timeout"] == 1.5
+        assert call_args[1]["verify"] is False
 

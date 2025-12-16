@@ -68,6 +68,7 @@ class TrafficFlowResponse:
     """Response model for traffic flow data"""
     data: Dict[str, Any]
     raw_response: Optional[Dict[str, Any]] = None
+    request_id: Optional[str] = None
     
     def __post_init__(self):
         """Parse response data"""
@@ -103,6 +104,7 @@ class TrafficIncidentResponse:
     """Response model for traffic incident data"""
     data: Dict[str, Any]
     raw_response: Optional[Dict[str, Any]] = None
+    request_id: Optional[str] = None
     
     def __post_init__(self):
         """Parse response data"""
@@ -141,6 +143,7 @@ class AvailabilityResponse:
     """Response model for API availability data"""
     data: Dict[str, Any]
     raw_response: Optional[Dict[str, Any]] = None
+    request_id: Optional[str] = None
     
     def __post_init__(self):
         """Parse response data"""

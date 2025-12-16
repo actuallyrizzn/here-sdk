@@ -25,6 +25,7 @@ from .auth import AuthClient, AuthMethod
 from .v7 import TrafficAPIv7
 from .v6 import TrafficAPIv6
 from .v3 import TrafficAPIv3
+from .http import HttpConfig, TimeoutType, VerifyType
 from .models import (
     TrafficFlowResponse,
     TrafficIncidentResponse,
@@ -41,6 +42,9 @@ __all__ = [
     "TrafficAPIv7",
     "TrafficAPIv6",
     "TrafficAPIv3",
+    "HttpConfig",
+    "TimeoutType",
+    "VerifyType",
     "TrafficFlowResponse",
     "TrafficIncidentResponse",
     "AvailabilityResponse",
