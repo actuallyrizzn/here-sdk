@@ -16,6 +16,14 @@ from .models import (
     TrafficIncidentResponse,
     AvailabilityResponse,
 )
+try:
+    from .validation import sanitize_query_params, validate_geospatial_filter
+except ImportError:
+    # Fallback if validation module not available
+    def sanitize_query_params(params):
+        return params
+    def validate_geospatial_filter(filter_str):
+        return filter_str
 
 
 class TrafficAPIv7:
@@ -83,11 +91,12 @@ class TrafficAPIv7:
             >>> filter_str = GeospatialFilter.circle(51.50643, -0.12719, 1000)
             >>> response = client.get_flow(LocationReference.SHAPE, filter_str)
         """
+        geospatial_filter = validate_geospatial_filter(geospatial_filter)
         params = {
             "locationReferencing": location_referencing.value,
             "in": geospatial_filter,
             **self.auth_client.get_auth_params(),
-            **kwargs
+            **sanitize_query_params(kwargs),
         }
         
         headers = self.auth_client.get_auth_headers()
@@ -174,11 +183,12 @@ class TrafficAPIv7:
             >>> filter_str = GeospatialFilter.circle(51.50643, -0.12719, 1000)
             >>> response = client.get_incidents(LocationReference.SHAPE, filter_str)
         """
+        geospatial_filter = validate_geospatial_filter(geospatial_filter)
         params = {
             "locationReferencing": location_referencing.value,
             "in": geospatial_filter,
             **self.auth_client.get_auth_params(),
-            **kwargs
+            **sanitize_query_params(kwargs),
         }
         
         headers = self.auth_client.get_auth_headers()
@@ -255,7 +265,7 @@ class TrafficAPIv7:
         """
         params = {
             **self.auth_client.get_auth_params(),
-            **kwargs
+            **sanitize_query_params(kwargs),
         }
         
         headers = self.auth_client.get_auth_headers()

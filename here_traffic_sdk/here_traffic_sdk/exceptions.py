@@ -24,6 +24,10 @@ class HereTrafficHTTPError(requests.HTTPError, HereTrafficSDKError):
     """Raised for HTTP failures in SDK requests."""
 
 
+class HereConnectionError(HereTrafficSDKError):
+    """Networking/transport error (timeouts, DNS, etc.)."""
+
+
 def raise_for_status_with_context(
     *,
     response: requests.Response,

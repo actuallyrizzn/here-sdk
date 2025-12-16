@@ -5,10 +5,10 @@ Supports API Key and OAuth 2.0 authentication
 
 from enum import Enum
 from typing import Optional
+import threading
 import requests
 from datetime import datetime, timedelta
 from .http import HttpConfig, _has_header, _redact_headers
-
 from . import constants
 from .exceptions import HereTrafficAuthError, raise_for_status_with_context
 
@@ -55,6 +55,7 @@ class AuthClient:
         # OAuth token management
         self._oauth_token: Optional[str] = None
         self._token_expires_at: Optional[datetime] = None
+        self._token_lock = threading.Lock()
     
     def get_auth_headers(self) -> dict:
         """
@@ -90,46 +91,55 @@ class AuthClient:
         Returns:
             OAuth access token string
         """
-        # Check if we have a valid token
+        # Fast-path check (unsynchronized) to avoid lock overhead in the common case.
         if self._oauth_token and self._token_expires_at:
             if datetime.now() < self._token_expires_at - timedelta(minutes=5):
                 return self._oauth_token
-        
-        # Request new token
-        if not self.access_key_id or not self.access_key_secret:
-            raise HereTrafficAuthError(
-                "HERE_TRAFFIC_SDK_AUTH_ERROR: OAuth credentials (access_key_id and access_key_secret) are required for OAuth authentication"
-            )
-        
-        headers = self._oauth_request_headers()
-        headers["Content-Type"] = constants.CONTENT_TYPE_FORM_URLENCODED
-        headers["User-Agent"] = constants.DEFAULT_USER_AGENT
-        
-        response = requests.post(
-            self.OAUTH_TOKEN_URL,
-            data={
-                "grant_type": "client_credentials",
-                "client_id": self.access_key_id,
-                "client_secret": self.access_key_secret,
-            },
-            headers=headers,
-            timeout=self.http_config.timeout,
-            verify=self.http_config.verify,
-        )
-        
-        raise_for_status_with_context(
-            response=response, method="POST", url=self.OAUTH_TOKEN_URL, prefix="HERE_TRAFFIC_SDK_OAUTH_ERROR"
-        )
-        try:
-            token_data = response.json()
-        except ValueError as e:
-            raise ValueError(f"Invalid JSON response from OAuth token endpoint: {self.OAUTH_TOKEN_URL}") from e
-        
-        self._oauth_token = token_data["access_token"]
-        expires_in = token_data.get("expires_in", 3600)
-        self._token_expires_at = datetime.now() + timedelta(seconds=expires_in)
 
-        return self._oauth_token
+        with self._token_lock:
+            # Double-check inside lock to avoid token thundering herd.
+            if self._oauth_token and self._token_expires_at:
+                if datetime.now() < self._token_expires_at - timedelta(minutes=5):
+                    return self._oauth_token
+
+            # Request new token
+            if not self.access_key_id or not self.access_key_secret:
+                raise HereTrafficAuthError(
+                    "HERE_TRAFFIC_SDK_AUTH_ERROR: OAuth credentials (access_key_id and access_key_secret) are required for OAuth authentication"
+                )
+
+            headers = self._oauth_request_headers()
+            headers["Content-Type"] = constants.CONTENT_TYPE_FORM_URLENCODED
+            headers["User-Agent"] = constants.DEFAULT_USER_AGENT
+
+            try:
+                response = requests.post(
+                    self.OAUTH_TOKEN_URL,
+                    data={
+                        "grant_type": "client_credentials",
+                        "client_id": self.access_key_id,
+                        "client_secret": self.access_key_secret,
+                    },
+                    headers=headers,
+                    timeout=self.http_config.timeout,
+                    verify=self.http_config.verify,
+                )
+            except requests.RequestException as exc:
+                raise HereTrafficAuthError(f"HERE_TRAFFIC_SDK_AUTH_ERROR: Failed to request OAuth token: {exc}") from exc
+
+            raise_for_status_with_context(
+                response=response, method="POST", url=self.OAUTH_TOKEN_URL, prefix="HERE_TRAFFIC_SDK_OAUTH_ERROR"
+            )
+            try:
+                token_data = response.json()
+            except ValueError as e:
+                raise ValueError(f"Invalid JSON response from OAuth token endpoint: {self.OAUTH_TOKEN_URL}") from e
+
+            self._oauth_token = token_data["access_token"]
+            expires_in = token_data.get("expires_in", 3600)
+            self._token_expires_at = datetime.now() + timedelta(seconds=expires_in)
+
+            return self._oauth_token
 
     def _oauth_request_headers(self) -> dict:
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
@@ -150,7 +160,8 @@ class AuthClient:
     
     def refresh_token(self):
         """Manually refresh OAuth token"""
-        self._oauth_token = None
-        self._token_expires_at = None
+        with self._token_lock:
+            self._oauth_token = None
+            self._token_expires_at = None
         self._get_oauth_token()
 

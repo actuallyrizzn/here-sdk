@@ -85,6 +85,18 @@ pip install -e .
 pip install -r requirements-dev.txt
 ```
 
+### Pre-commit Hooks
+
+This repo uses [pre-commit](https://pre-commit.com/) to run formatting and lint checks automatically.
+
+```bash
+# Install git hooks
+pre-commit install
+
+# (Optional) Run on all files
+pre-commit run --all-files
+```
+
 ### Running Tests
 
 ```bash

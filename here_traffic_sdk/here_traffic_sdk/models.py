@@ -6,6 +6,13 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
 
+from .validation import (
+    validate_encoded_polyline,
+    validate_latitude,
+    validate_longitude,
+    validate_radius_meters,
+)
+
 
 class LocationReference(str, Enum):
     """Location referencing methods"""
@@ -31,7 +38,10 @@ class GeospatialFilter:
         Returns:
             Circle filter string
         """
-        return f"circle:{latitude},{longitude};r={radius_meters}"
+        lat = validate_latitude(latitude)
+        lon = validate_longitude(longitude)
+        radius = validate_radius_meters(radius_meters)
+        return f"circle:{lat},{lon};r={radius}"
     
     @staticmethod
     def bbox(lat1: float, lon1: float, lat2: float, lon2: float) -> str:
@@ -47,7 +57,11 @@ class GeospatialFilter:
         Returns:
             Bounding box filter string
         """
-        return f"bbox:{lat1},{lon1};{lat2},{lon2}"
+        a_lat = validate_latitude(lat1)
+        a_lon = validate_longitude(lon1)
+        b_lat = validate_latitude(lat2)
+        b_lon = validate_longitude(lon2)
+        return f"bbox:{a_lat},{a_lon};{b_lat},{b_lon}"
     
     @staticmethod
     def corridor(encoded_polyline: str) -> str:
@@ -60,7 +74,33 @@ class GeospatialFilter:
         Returns:
             Corridor filter string
         """
-        return f"corridor:{encoded_polyline}"
+        polyline = validate_encoded_polyline(encoded_polyline)
+        return f"corridor:{polyline}"
+
+
+def _coerce_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        s = value.strip().lower()
+        if s in {"true", "1", "yes", "y", "on"}:
+            return True
+        if s in {"false", "0", "no", "n", "off"}:
+            return False
+    return False
 
 
 @dataclass
@@ -86,7 +126,9 @@ class TrafficFlowResponse:
         speeds = []
         for flow in self.flows:
             if "freeFlowSpeed" in flow:
-                speeds.append(flow["freeFlowSpeed"])
+                coerced = _coerce_float(flow.get("freeFlowSpeed"))
+                if coerced is not None:
+                    speeds.append(coerced)
         return speeds
     
     @property
@@ -95,7 +137,9 @@ class TrafficFlowResponse:
         speeds = []
         for flow in self.flows:
             if "expectedSpeed" in flow:
-                speeds.append(flow["expectedSpeed"])
+                coerced = _coerce_float(flow.get("expectedSpeed"))
+                if coerced is not None:
+                    speeds.append(coerced)
         return speeds
 
 
@@ -153,7 +197,7 @@ class AvailabilityResponse:
     @property
     def available(self) -> bool:
         """Check if API is available"""
-        return self.data.get("available", False)
+        return _coerce_bool(self.data.get("available", False))
     
     @property
     def coverage_areas(self) -> List[Dict[str, Any]]:
