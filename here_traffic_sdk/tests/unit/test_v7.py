@@ -7,6 +7,8 @@ from unittest.mock import Mock, MagicMock, patch
 import requests
 from here_traffic_sdk.v7 import TrafficAPIv7
 from here_traffic_sdk.models import LocationReference, GeospatialFilter
+from here_traffic_sdk import constants
+from here_traffic_sdk.exceptions import HereTrafficHTTPError
 
 
 class TestTrafficAPIv7:
@@ -18,6 +20,7 @@ class TestTrafficAPIv7:
         assert client.auth_client == auth_client_api_key
         assert client.BASE_URL == "https://data.traffic.hereapi.com/v7"
         assert client.session is not None
+        assert client.session.headers["User-Agent"] == constants.DEFAULT_USER_AGENT
     
     def test_get_flow(self, auth_client_api_key, mock_flow_response, mock_requests_session):
         """Test get_flow method"""
@@ -87,11 +90,12 @@ class TestTrafficAPIv7:
         mock_requests_session.get.return_value = mock_response
         
         client = TrafficAPIv7(auth_client_api_key)
-        with pytest.raises(requests.HTTPError):
+        with pytest.raises(requests.HTTPError) as exc:
             client.get_flow(
                 location_referencing=LocationReference.SHAPE,
                 geospatial_filter="circle:51.50643,-0.12719;r=1000"
             )
+        assert isinstance(exc.value, HereTrafficHTTPError)
     
     def test_get_flow_circle(self, auth_client_api_key, mock_flow_response, mock_requests_session):
         """Test get_flow_circle convenience method"""
