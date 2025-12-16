@@ -21,6 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 from .client import HereTrafficClient
+from .async_client import AsyncHereTrafficClient
 from .auth import AuthClient, AuthMethod
 from .config import HereTrafficConfig
 from .exceptions import (
@@ -48,6 +49,7 @@ from .models import (
 from ._version import __version__
 __all__ = [
     "HereTrafficClient",
+    "AsyncHereTrafficClient",
     "AuthClient",
     "AuthMethod",
     "HereTrafficConfig",
