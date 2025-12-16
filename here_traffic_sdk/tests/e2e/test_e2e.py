@@ -7,6 +7,7 @@ Uses a mock HTTP server to simulate real API responses.
 
 import pytest
 import json
+from unittest.mock import patch
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
 from here_traffic_sdk import HereTrafficClient, LocationReference, GeospatialFilter, AuthMethod

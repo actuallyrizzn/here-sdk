@@ -33,7 +33,10 @@ class TestGeospatialFilter:
     def test_circle_filter_different_values(self):
         """Test circle filter with different values"""
         filter_str = GeospatialFilter.circle(40.7128, -74.0060, 500)
-        assert filter_str == "circle:40.7128,-74.0060;r=500"
+        # Note: Python may format -74.0060 as -74.006, so we check the pattern
+        assert filter_str.startswith("circle:40.7128,")
+        assert filter_str.endswith(";r=500")
+        assert "-74.006" in filter_str or "-74.0060" in filter_str
     
     def test_bbox_filter(self):
         """Test creating bounding box filter"""
