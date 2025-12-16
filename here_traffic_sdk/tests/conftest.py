@@ -124,7 +124,8 @@ def mock_availability_response():
 @pytest.fixture
 def mock_requests_session():
     """Mock requests session"""
-    with patch('here_traffic_sdk.v7.requests.Session') as mock_session_class:
+    # Patch the `requests` library directly so it applies to v3/v6/v7 clients.
+    with patch('requests.Session') as mock_session_class:
         mock_session = MagicMock()
         mock_session_class.return_value = mock_session
         yield mock_session

@@ -3,8 +3,11 @@ Unit tests for main client
 """
 
 import pytest
+from unittest.mock import Mock
 from here_traffic_sdk.client import HereTrafficClient
 from here_traffic_sdk.auth import AuthMethod
+from here_traffic_sdk.config import HereTrafficConfig
+from here_traffic_sdk.models import LocationReference
 
 
 class TestHereTrafficClient:
@@ -53,4 +56,19 @@ class TestHereTrafficClient:
         assert client.v7.auth_client == client.auth_client
         assert client.v6.auth_client == client.auth_client
         assert client.v3.auth_client == client.auth_client
+
+    def test_config_overrides_base_url(self, mock_api_key, mock_flow_response, mock_requests_session):
+        """Test passing config changes the endpoint URL used"""
+        cfg = HereTrafficConfig(v7_base_url="https://example.test/v7")
+        client = HereTrafficClient(api_key=mock_api_key, config=cfg)
+
+        mock_response = Mock()
+        mock_response.json.return_value = mock_flow_response
+        mock_response.raise_for_status = Mock()
+        mock_requests_session.get.return_value = mock_response
+
+        client.v7.get_flow(LocationReference.SHAPE, "circle:51.50643,-0.12719;r=1000")
+
+        called_url = mock_requests_session.get.call_args[0][0]
+        assert called_url.startswith("https://example.test/v7/")
 

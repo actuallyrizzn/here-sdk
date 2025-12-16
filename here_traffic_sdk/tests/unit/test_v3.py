@@ -6,6 +6,7 @@ import pytest
 from unittest.mock import Mock, patch
 import requests
 from here_traffic_sdk.v3 import TrafficAPIv3
+from here_traffic_sdk.exceptions import HereClientError
 
 
 class TestTrafficAPIv3:
@@ -51,11 +52,12 @@ class TestTrafficAPIv3:
     def test_get_flow_http_error(self, auth_client_api_key, mock_requests_session):
         """Test get_flow with HTTP error"""
         mock_response = Mock()
-        mock_response.raise_for_status.side_effect = requests.HTTPError("400 Bad Request")
+        mock_response.status_code = 400
+        mock_response.url = "https://traffic.api.here.com/v3/flow"
         mock_requests_session.get.return_value = mock_response
         
         client = TrafficAPIv3(auth_client_api_key)
-        with pytest.raises(requests.HTTPError):
+        with pytest.raises(HereClientError):
             client.get_flow()
     
     def test_get_flow_with_oauth(self, auth_client_oauth, mock_flow_response, mock_oauth_token_response, mock_requests_session, mock_requests_post):

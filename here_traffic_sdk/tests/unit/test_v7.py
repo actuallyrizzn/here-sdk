@@ -7,6 +7,7 @@ from unittest.mock import Mock, MagicMock, patch
 import requests
 from here_traffic_sdk.v7 import TrafficAPIv7
 from here_traffic_sdk.models import LocationReference, GeospatialFilter
+from here_traffic_sdk.exceptions import HereClientError
 
 
 class TestTrafficAPIv7:
@@ -83,14 +84,25 @@ class TestTrafficAPIv7:
     def test_get_flow_http_error(self, auth_client_api_key, mock_requests_session):
         """Test get_flow with HTTP error"""
         mock_response = Mock()
-        mock_response.raise_for_status.side_effect = requests.HTTPError("400 Bad Request")
+        mock_response.status_code = 400
+        mock_response.url = "https://data.traffic.hereapi.com/v7/flow"
         mock_requests_session.get.return_value = mock_response
         
         client = TrafficAPIv7(auth_client_api_key)
-        with pytest.raises(requests.HTTPError):
+        with pytest.raises(HereClientError):
             client.get_flow(
                 location_referencing=LocationReference.SHAPE,
                 geospatial_filter="circle:51.50643,-0.12719;r=1000"
+            )
+
+    def test_get_flow_rejects_invalid_kwargs(self, auth_client_api_key, mock_requests_session):
+        """Test get_flow rejects non-primitive query params"""
+        client = TrafficAPIv7(auth_client_api_key)
+        with pytest.raises(ValueError, match="must be a primitive"):
+            client.get_flow(
+                location_referencing=LocationReference.SHAPE,
+                geospatial_filter="circle:51.50643,-0.12719;r=1000",
+                bad={"nested": "dict"},
             )
     
     def test_get_flow_circle(self, auth_client_api_key, mock_flow_response, mock_requests_session):

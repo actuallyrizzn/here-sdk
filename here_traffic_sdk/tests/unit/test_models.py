@@ -54,6 +54,21 @@ class TestGeospatialFilter:
         filter_str = GeospatialFilter.corridor(encoded_polyline)
         assert filter_str == f"corridor:{encoded_polyline}"
 
+    def test_circle_filter_rejects_invalid_latitude(self):
+        """Test circle filter validation rejects invalid latitude"""
+        with pytest.raises(ValueError, match="Latitude must be between"):
+            GeospatialFilter.circle(123.0, 0.0, 1000)
+
+    def test_circle_filter_rejects_negative_radius(self):
+        """Test circle filter validation rejects negative radius"""
+        with pytest.raises(ValueError, match="non-negative"):
+            GeospatialFilter.circle(0.0, 0.0, -1)
+
+    def test_corridor_filter_rejects_injection_chars(self):
+        """Test corridor filter blocks ';' and control chars"""
+        with pytest.raises(ValueError, match="invalid characters"):
+            GeospatialFilter.corridor("abc;def")
+
 
 class TestTrafficFlowResponse:
     """Test TrafficFlowResponse model"""
@@ -113,6 +128,18 @@ class TestTrafficFlowResponse:
         data = {"flows": [{"other": "data"}]}
         response = TrafficFlowResponse(data=data)
         assert response.expected_speeds == []
+
+    def test_speed_properties_coerce_types(self):
+        """Test speed properties coerce numeric strings and skip invalid values"""
+        data = {
+            "flows": [
+                {"freeFlowSpeed": "60.5", "expectedSpeed": "45"},
+                {"freeFlowSpeed": None, "expectedSpeed": "oops"},
+            ]
+        }
+        response = TrafficFlowResponse(data=data)
+        assert response.free_flow_speeds == [60.5]
+        assert response.expected_speeds == [45.0]
 
 
 class TestTrafficIncidentResponse:
@@ -229,6 +256,14 @@ class TestAvailabilityResponse:
         """Test available property when key is missing"""
         response = AvailabilityResponse(data={})
         assert response.available is False
+
+    def test_available_property_coerces_string_and_numeric(self):
+        """Test available coercion for string/numeric values"""
+        assert AvailabilityResponse(data={"available": "true"}).available is True
+        assert AvailabilityResponse(data={"available": "0"}).available is False
+        assert AvailabilityResponse(data={"available": 1}).available is True
+        assert AvailabilityResponse(data={"available": "maybe"}).available is False
+        assert AvailabilityResponse(data={"available": None}).available is False
     
     def test_coverage_areas_property(self, mock_availability_response):
         """Test coverage_areas property"""

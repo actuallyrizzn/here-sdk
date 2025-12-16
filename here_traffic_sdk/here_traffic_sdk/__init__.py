@@ -22,6 +22,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from .client import HereTrafficClient
 from .auth import AuthClient, AuthMethod
+from .config import HereTrafficConfig
+from .exceptions import (
+    HereSDKError,
+    HereAPIError,
+    HereAuthenticationError,
+    HereRateLimitError,
+    HereNotFoundError,
+    HereClientError,
+    HereServerError,
+    HereConnectionError,
+)
 from .v7 import TrafficAPIv7
 from .v6 import TrafficAPIv6
 from .v3 import TrafficAPIv3
@@ -38,6 +49,15 @@ __all__ = [
     "HereTrafficClient",
     "AuthClient",
     "AuthMethod",
+    "HereTrafficConfig",
+    "HereSDKError",
+    "HereAPIError",
+    "HereAuthenticationError",
+    "HereRateLimitError",
+    "HereNotFoundError",
+    "HereClientError",
+    "HereServerError",
+    "HereConnectionError",
     "TrafficAPIv7",
     "TrafficAPIv6",
     "TrafficAPIv3",

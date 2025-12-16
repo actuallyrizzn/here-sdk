@@ -5,8 +5,11 @@ Unit tests for authentication module
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timedelta
+import threading
+import time
 import requests
 from here_traffic_sdk.auth import AuthClient, AuthMethod
+from here_traffic_sdk.exceptions import HereAuthenticationError
 
 
 class TestAuthClient:
@@ -118,10 +121,11 @@ class TestAuthClient:
     def test_get_oauth_token_http_error(self, auth_client_oauth, mock_requests_post):
         """Test OAuth token request with HTTP error"""
         mock_response = Mock()
-        mock_response.raise_for_status.side_effect = requests.HTTPError("401 Unauthorized")
+        mock_response.status_code = 401
+        mock_response.url = "https://account.api.here.com/oauth2/token"
         mock_requests_post.return_value = mock_response
         
-        with pytest.raises(requests.HTTPError):
+        with pytest.raises(HereAuthenticationError):
             auth_client_oauth._get_oauth_token()
     
     def test_refresh_token(self, auth_client_oauth, mock_oauth_token_response, mock_requests_post):
@@ -175,7 +179,7 @@ class TestAuthClient:
         """Test OAuth token request includes correct parameters"""
         mock_response = Mock()
         mock_response.json.return_value = mock_oauth_token_response
-        mock_response.raise_for_status = Mock()
+        mock_response.status_code = 200
         mock_requests_post.return_value = mock_response
         
         auth_client_oauth._get_oauth_token()
@@ -187,4 +191,39 @@ class TestAuthClient:
         assert call_args[1]["data"]["client_id"] == auth_client_oauth.access_key_id
         assert call_args[1]["data"]["client_secret"] == auth_client_oauth.access_key_secret
         assert call_args[1]["headers"]["Content-Type"] == "application/x-www-form-urlencoded"
+
+    def test_get_oauth_token_thread_safe_single_request(self, auth_client_oauth, mock_oauth_token_response, mock_requests_post):
+        """Test concurrent callers only trigger one token request"""
+
+        def slow_post(*args, **kwargs):
+            # Force enough overlap that races would show up as multiple calls.
+            time.sleep(0.05)
+            resp = Mock()
+            resp.status_code = 200
+            resp.json.return_value = mock_oauth_token_response
+            return resp
+
+        mock_requests_post.side_effect = slow_post
+
+        barrier = threading.Barrier(10)
+        results = []
+        errors = []
+
+        def worker():
+            try:
+                barrier.wait()
+                results.append(auth_client_oauth.get_auth_headers()["Authorization"])
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [threading.Thread(target=worker) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=5)
+
+        assert not errors
+        assert len(results) == 10
+        assert all(r == f"Bearer {mock_oauth_token_response['access_token']}" for r in results)
+        assert mock_requests_post.call_count == 1
 

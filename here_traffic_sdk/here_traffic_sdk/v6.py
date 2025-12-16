@@ -6,7 +6,11 @@ Legacy version maintained for backward compatibility
 from typing import Optional, Dict, Any
 import requests
 from .auth import AuthClient
+from .config import HereTrafficConfig
+from .exceptions import HereConnectionError
+from .http import raise_for_here_status
 from .models import TrafficFlowResponse, TrafficIncidentResponse
+from .validation import sanitize_query_params, validate_bbox_string
 
 
 class TrafficAPIv6:
@@ -19,7 +23,7 @@ class TrafficAPIv6:
     
     BASE_URL = "https://traffic.api.here.com/traffic/6.3"
     
-    def __init__(self, auth_client: AuthClient):
+    def __init__(self, auth_client: AuthClient, config: Optional[HereTrafficConfig] = None):
         """
         Initialize Traffic API v6.3 client
         
@@ -27,7 +31,9 @@ class TrafficAPIv6:
             auth_client: Authenticated AuthClient instance
         """
         self.auth_client = auth_client
+        self.config = config or getattr(auth_client, "config", None) or HereTrafficConfig.from_env()
         self.session = requests.Session()
+        self.base_url = self.config.v6_base_url or self.BASE_URL
     
     def get_flow(
         self,
@@ -48,20 +54,25 @@ class TrafficAPIv6:
             >>> client = TrafficAPIv6(auth_client)
             >>> response = client.get_flow("51.5,-0.13;51.51,-0.12")
         """
+        bbox = validate_bbox_string(bbox)
         params = {
             "bbox": bbox,
             **self.auth_client.get_auth_params(),
-            **kwargs
+            **sanitize_query_params(kwargs),
         }
         
         headers = self.auth_client.get_auth_headers()
         
-        response = self.session.get(
-            f"{self.BASE_URL}/flow.json",
-            params=params,
-            headers=headers
-        )
-        response.raise_for_status()
+        try:
+            response = self.session.get(
+                f"{self.base_url}/flow.json",
+                params=params,
+                headers=headers,
+                timeout=self.config.http_timeout_seconds,
+            )
+        except requests.RequestException as exc:
+            raise HereConnectionError(f"Failed to call HERE Traffic v6.3 flow endpoint: {exc}") from exc
+        raise_for_here_status(response)
         
         return TrafficFlowResponse(data=response.json(), raw_response=response.json())
     
@@ -108,20 +119,25 @@ class TrafficAPIv6:
             >>> client = TrafficAPIv6(auth_client)
             >>> response = client.get_incidents("51.5,-0.13;51.51,-0.12")
         """
+        bbox = validate_bbox_string(bbox)
         params = {
             "bbox": bbox,
             **self.auth_client.get_auth_params(),
-            **kwargs
+            **sanitize_query_params(kwargs),
         }
         
         headers = self.auth_client.get_auth_headers()
         
-        response = self.session.get(
-            f"{self.BASE_URL}/incidents.json",
-            params=params,
-            headers=headers
-        )
-        response.raise_for_status()
+        try:
+            response = self.session.get(
+                f"{self.base_url}/incidents.json",
+                params=params,
+                headers=headers,
+                timeout=self.config.http_timeout_seconds,
+            )
+        except requests.RequestException as exc:
+            raise HereConnectionError(f"Failed to call HERE Traffic v6.3 incidents endpoint: {exc}") from exc
+        raise_for_here_status(response)
         
         return TrafficIncidentResponse(data=response.json(), raw_response=response.json())
     

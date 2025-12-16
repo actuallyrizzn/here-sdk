@@ -6,6 +6,7 @@ import pytest
 from unittest.mock import Mock, patch
 import requests
 from here_traffic_sdk.v6 import TrafficAPIv6
+from here_traffic_sdk.exceptions import HereClientError
 
 
 class TestTrafficAPIv6:
@@ -51,12 +52,19 @@ class TestTrafficAPIv6:
     def test_get_flow_http_error(self, auth_client_api_key, mock_requests_session):
         """Test get_flow with HTTP error"""
         mock_response = Mock()
-        mock_response.raise_for_status.side_effect = requests.HTTPError("400 Bad Request")
+        mock_response.status_code = 400
+        mock_response.url = "https://traffic.api.here.com/traffic/6.3/flow.json"
         mock_requests_session.get.return_value = mock_response
         
         client = TrafficAPIv6(auth_client_api_key)
-        with pytest.raises(requests.HTTPError):
+        with pytest.raises(HereClientError):
             client.get_flow("51.5,-0.13;51.51,-0.12")
+
+    def test_get_flow_rejects_invalid_bbox(self, auth_client_api_key):
+        """Test v6 bbox string validation"""
+        client = TrafficAPIv6(auth_client_api_key)
+        with pytest.raises(ValueError, match="bbox must be in format"):
+            client.get_flow("not-a-bbox")
     
     def test_get_flow_bbox(self, auth_client_api_key, mock_flow_response, mock_requests_session):
         """Test get_flow_bbox convenience method"""

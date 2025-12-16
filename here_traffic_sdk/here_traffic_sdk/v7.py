@@ -6,6 +6,9 @@ Current version of the Traffic API
 from typing import Optional, Dict, Any
 import requests
 from .auth import AuthClient
+from .config import HereTrafficConfig
+from .exceptions import HereConnectionError
+from .http import raise_for_here_status
 from .models import (
     LocationReference,
     GeospatialFilter,
@@ -13,6 +16,7 @@ from .models import (
     TrafficIncidentResponse,
     AvailabilityResponse,
 )
+from .validation import sanitize_query_params, validate_geospatial_filter
 
 
 class TrafficAPIv7:
@@ -27,7 +31,7 @@ class TrafficAPIv7:
     
     BASE_URL = "https://data.traffic.hereapi.com/v7"
     
-    def __init__(self, auth_client: AuthClient):
+    def __init__(self, auth_client: AuthClient, config: Optional[HereTrafficConfig] = None):
         """
         Initialize Traffic API v7 client
         
@@ -35,7 +39,9 @@ class TrafficAPIv7:
             auth_client: Authenticated AuthClient instance
         """
         self.auth_client = auth_client
+        self.config = config or getattr(auth_client, "config", None) or HereTrafficConfig.from_env()
         self.session = requests.Session()
+        self.base_url = self.config.v7_base_url or self.BASE_URL
     
     def get_flow(
         self,
@@ -59,21 +65,26 @@ class TrafficAPIv7:
             >>> filter_str = GeospatialFilter.circle(51.50643, -0.12719, 1000)
             >>> response = client.get_flow(LocationReference.SHAPE, filter_str)
         """
+        geospatial_filter = validate_geospatial_filter(geospatial_filter)
         params = {
             "locationReferencing": location_referencing.value,
             "in": geospatial_filter,
             **self.auth_client.get_auth_params(),
-            **kwargs
+            **sanitize_query_params(kwargs),
         }
         
         headers = self.auth_client.get_auth_headers()
         
-        response = self.session.get(
-            f"{self.BASE_URL}/flow",
-            params=params,
-            headers=headers
-        )
-        response.raise_for_status()
+        try:
+            response = self.session.get(
+                f"{self.base_url}/flow",
+                params=params,
+                headers=headers,
+                timeout=self.config.http_timeout_seconds,
+            )
+        except requests.RequestException as exc:
+            raise HereConnectionError(f"Failed to call HERE Traffic v7 flow endpoint: {exc}") from exc
+        raise_for_here_status(response)
         
         return TrafficFlowResponse(data=response.json(), raw_response=response.json())
     
@@ -149,21 +160,26 @@ class TrafficAPIv7:
             >>> filter_str = GeospatialFilter.circle(51.50643, -0.12719, 1000)
             >>> response = client.get_incidents(LocationReference.SHAPE, filter_str)
         """
+        geospatial_filter = validate_geospatial_filter(geospatial_filter)
         params = {
             "locationReferencing": location_referencing.value,
             "in": geospatial_filter,
             **self.auth_client.get_auth_params(),
-            **kwargs
+            **sanitize_query_params(kwargs),
         }
         
         headers = self.auth_client.get_auth_headers()
         
-        response = self.session.get(
-            f"{self.BASE_URL}/incidents",
-            params=params,
-            headers=headers
-        )
-        response.raise_for_status()
+        try:
+            response = self.session.get(
+                f"{self.base_url}/incidents",
+                params=params,
+                headers=headers,
+                timeout=self.config.http_timeout_seconds,
+            )
+        except requests.RequestException as exc:
+            raise HereConnectionError(f"Failed to call HERE Traffic v7 incidents endpoint: {exc}") from exc
+        raise_for_here_status(response)
         
         return TrafficIncidentResponse(data=response.json(), raw_response=response.json())
     
@@ -229,17 +245,21 @@ class TrafficAPIv7:
         """
         params = {
             **self.auth_client.get_auth_params(),
-            **kwargs
+            **sanitize_query_params(kwargs),
         }
         
         headers = self.auth_client.get_auth_headers()
         
-        response = self.session.get(
-            f"{self.BASE_URL}/availability",
-            params=params,
-            headers=headers
-        )
-        response.raise_for_status()
+        try:
+            response = self.session.get(
+                f"{self.base_url}/availability",
+                params=params,
+                headers=headers,
+                timeout=self.config.http_timeout_seconds,
+            )
+        except requests.RequestException as exc:
+            raise HereConnectionError(f"Failed to call HERE Traffic v7 availability endpoint: {exc}") from exc
+        raise_for_here_status(response)
         
         return AvailabilityResponse(data=response.json(), raw_response=response.json())
 
