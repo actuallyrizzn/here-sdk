@@ -55,6 +55,19 @@ class HereTrafficClient:
         self.v7 = TrafficAPIv7(self.auth_client)
         self.v6 = TrafficAPIv6(self.auth_client)
         self.v3 = TrafficAPIv3(self.auth_client)
+
+    def close(self) -> None:
+        """Close underlying HTTP sessions."""
+        # Close in reverse creation order (doesn't matter, but consistent).
+        self.v3.close()
+        self.v6.close()
+        self.v7.close()
+
+    def __enter__(self) -> "HereTrafficClient":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
     
     @property
     def flow(self):

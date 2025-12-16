@@ -28,6 +28,10 @@ class TrafficAPIv6:
         """
         self.auth_client = auth_client
         self.session = requests.Session()
+
+    def close(self) -> None:
+        """Close the underlying HTTP session."""
+        self.session.close()
     
     def get_flow(
         self,
