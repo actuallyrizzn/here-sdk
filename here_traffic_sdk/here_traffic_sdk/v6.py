@@ -6,6 +6,7 @@ Legacy version maintained for backward compatibility
 from typing import Optional, Dict, Any
 import requests
 from .auth import AuthClient
+from ._retry import RetryConfig, get_with_retries
 from .models import TrafficFlowResponse, TrafficIncidentResponse
 
 
@@ -19,15 +20,17 @@ class TrafficAPIv6:
     
     BASE_URL = "https://traffic.api.here.com/traffic/6.3"
     
-    def __init__(self, auth_client: AuthClient):
+    def __init__(self, auth_client: AuthClient, retry_config: Optional[RetryConfig] = None):
         """
         Initialize Traffic API v6.3 client
         
         Args:
             auth_client: Authenticated AuthClient instance
+            retry_config: Optional retry/backoff configuration
         """
         self.auth_client = auth_client
         self.session = requests.Session()
+        self.retry_config = retry_config or RetryConfig()
     
     def get_flow(
         self,
@@ -56,12 +59,13 @@ class TrafficAPIv6:
         
         headers = self.auth_client.get_auth_headers()
         
-        response = self.session.get(
+        response = get_with_retries(
+            self.session,
             f"{self.BASE_URL}/flow.json",
             params=params,
-            headers=headers
+            headers=headers,
+            retry_config=self.retry_config,
         )
-        response.raise_for_status()
         
         return TrafficFlowResponse(data=response.json(), raw_response=response.json())
     
@@ -116,12 +120,13 @@ class TrafficAPIv6:
         
         headers = self.auth_client.get_auth_headers()
         
-        response = self.session.get(
+        response = get_with_retries(
+            self.session,
             f"{self.BASE_URL}/incidents.json",
             params=params,
-            headers=headers
+            headers=headers,
+            retry_config=self.retry_config,
         )
-        response.raise_for_status()
         
         return TrafficIncidentResponse(data=response.json(), raw_response=response.json())
     

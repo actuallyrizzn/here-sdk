@@ -92,6 +92,31 @@ class TestTrafficAPIv7:
                 location_referencing=LocationReference.SHAPE,
                 geospatial_filter="circle:51.50643,-0.12719;r=1000"
             )
+
+    def test_get_flow_retries_on_429(self, auth_client_api_key, mock_flow_response, mock_requests_session):
+        """Test get_flow retries on rate limiting (429)"""
+        resp_429 = Mock()
+        resp_429.status_code = 429
+        resp_429.headers = {"Retry-After": "0"}
+        resp_429.raise_for_status = Mock()
+
+        resp_200 = Mock()
+        resp_200.status_code = 200
+        resp_200.headers = {}
+        resp_200.json.return_value = mock_flow_response
+        resp_200.raise_for_status = Mock()
+
+        mock_requests_session.get.side_effect = [resp_429, resp_200]
+
+        client = TrafficAPIv7(auth_client_api_key)
+        with patch("here_traffic_sdk._retry.time.sleep"):
+            result = client.get_flow(
+                location_referencing=LocationReference.SHAPE,
+                geospatial_filter="circle:51.50643,-0.12719;r=1000",
+            )
+
+        assert result.data == mock_flow_response
+        assert mock_requests_session.get.call_count == 2
     
     def test_get_flow_circle(self, auth_client_api_key, mock_flow_response, mock_requests_session):
         """Test get_flow_circle convenience method"""

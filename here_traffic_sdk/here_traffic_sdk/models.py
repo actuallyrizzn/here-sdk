@@ -5,6 +5,7 @@ Data models for HERE Traffic API responses
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
+import math
 
 
 class LocationReference(str, Enum):
@@ -17,6 +18,41 @@ class LocationReference(str, Enum):
 @dataclass
 class GeospatialFilter:
     """Geospatial filter for API requests"""
+
+    @staticmethod
+    def _validate_latitude(latitude: float) -> None:
+        if not isinstance(latitude, (int, float)) or isinstance(latitude, bool):
+            raise ValueError("latitude must be a number")
+        if not math.isfinite(float(latitude)):
+            raise ValueError("latitude must be finite")
+        if float(latitude) < -90.0 or float(latitude) > 90.0:
+            raise ValueError("latitude must be between -90 and 90")
+
+    @staticmethod
+    def _validate_longitude(longitude: float) -> None:
+        if not isinstance(longitude, (int, float)) or isinstance(longitude, bool):
+            raise ValueError("longitude must be a number")
+        if not math.isfinite(float(longitude)):
+            raise ValueError("longitude must be finite")
+        if float(longitude) < -180.0 or float(longitude) > 180.0:
+            raise ValueError("longitude must be between -180 and 180")
+
+    @staticmethod
+    def _validate_radius_meters(radius_meters: int) -> None:
+        if not isinstance(radius_meters, int) or isinstance(radius_meters, bool):
+            raise ValueError("radius_meters must be an int")
+        if radius_meters <= 0:
+            raise ValueError("radius_meters must be > 0")
+
+    @staticmethod
+    def _validate_corridor_polyline(encoded_polyline: str) -> None:
+        if not isinstance(encoded_polyline, str):
+            raise ValueError("encoded_polyline must be a string")
+        if not encoded_polyline:
+            raise ValueError("encoded_polyline must not be empty")
+        # Reject whitespace/control characters to avoid surprising encoding/injection issues.
+        if any(ch.isspace() for ch in encoded_polyline):
+            raise ValueError("encoded_polyline must not contain whitespace/control characters")
     
     @staticmethod
     def circle(latitude: float, longitude: float, radius_meters: int) -> str:
@@ -31,6 +67,9 @@ class GeospatialFilter:
         Returns:
             Circle filter string
         """
+        GeospatialFilter._validate_latitude(latitude)
+        GeospatialFilter._validate_longitude(longitude)
+        GeospatialFilter._validate_radius_meters(radius_meters)
         return f"circle:{latitude},{longitude};r={radius_meters}"
     
     @staticmethod
@@ -47,6 +86,10 @@ class GeospatialFilter:
         Returns:
             Bounding box filter string
         """
+        GeospatialFilter._validate_latitude(lat1)
+        GeospatialFilter._validate_longitude(lon1)
+        GeospatialFilter._validate_latitude(lat2)
+        GeospatialFilter._validate_longitude(lon2)
         return f"bbox:{lat1},{lon1};{lat2},{lon2}"
     
     @staticmethod
@@ -60,6 +103,7 @@ class GeospatialFilter:
         Returns:
             Corridor filter string
         """
+        GeospatialFilter._validate_corridor_polyline(encoded_polyline)
         return f"corridor:{encoded_polyline}"
 
 
