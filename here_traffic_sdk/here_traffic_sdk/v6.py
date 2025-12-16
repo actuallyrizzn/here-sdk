@@ -10,6 +10,14 @@ from . import constants
 from .exceptions import raise_for_status_with_context
 from .http import HttpConfig, get_json
 from .models import TrafficFlowResponse, TrafficIncidentResponse
+try:
+    from .validation import sanitize_query_params, validate_bbox_string
+except ImportError:
+    # Fallback if validation module not available
+    def sanitize_query_params(params):
+        return params
+    def validate_bbox_string(bbox):
+        return bbox
 
 
 class TrafficAPIv6:
@@ -72,10 +80,11 @@ class TrafficAPIv6:
             >>> client = TrafficAPIv6(auth_client)
             >>> response = client.get_flow("51.5,-0.13;51.51,-0.12")
         """
+        bbox = validate_bbox_string(bbox)
         params = {
             "bbox": bbox,
             **self.auth_client.get_auth_params(),
-            **kwargs
+            **sanitize_query_params(kwargs),
         }
         
         headers = self.auth_client.get_auth_headers()
@@ -133,10 +142,11 @@ class TrafficAPIv6:
             >>> client = TrafficAPIv6(auth_client)
             >>> response = client.get_incidents("51.5,-0.13;51.51,-0.12")
         """
+        bbox = validate_bbox_string(bbox)
         params = {
             "bbox": bbox,
             **self.auth_client.get_auth_params(),
-            **kwargs
+            **sanitize_query_params(kwargs),
         }
         
         headers = self.auth_client.get_auth_headers()

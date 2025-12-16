@@ -10,6 +10,12 @@ from . import constants
 from .exceptions import raise_for_status_with_context
 from .http import HttpConfig, get_json
 from .models import TrafficFlowResponse
+try:
+    from .validation import sanitize_query_params
+except ImportError:
+    # Fallback if validation module not available
+    def sanitize_query_params(params):
+        return params
 
 
 class TrafficAPIv3:
@@ -71,7 +77,7 @@ class TrafficAPIv3:
         """
         params = {
             **self.auth_client.get_auth_params(),
-            **kwargs
+            **sanitize_query_params(kwargs),
         }
         
         headers = self.auth_client.get_auth_headers()

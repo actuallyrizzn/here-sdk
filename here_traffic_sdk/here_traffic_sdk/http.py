@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
 import requests
+from .exceptions import raise_for_status_with_context
 
 TimeoutType = Union[float, Tuple[float, float]]
 VerifyType = Union[bool, str]
@@ -219,7 +220,12 @@ def get_json(
             attempt += 1
             continue
 
-        response.raise_for_status()
+        raise_for_status_with_context(
+            response=response,
+            method="GET",
+            url=url,
+            prefix="HERE_TRAFFIC_SDK_HTTP_ERROR",
+        )
         try:
             payload = response.json()
         except ValueError as e:
