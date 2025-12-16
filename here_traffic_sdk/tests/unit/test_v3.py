@@ -6,6 +6,8 @@ import pytest
 from unittest.mock import Mock, patch
 import requests
 from here_traffic_sdk.v3 import TrafficAPIv3
+from here_traffic_sdk import constants
+from here_traffic_sdk.exceptions import HereTrafficHTTPError
 
 
 class TestTrafficAPIv3:
@@ -17,6 +19,7 @@ class TestTrafficAPIv3:
         assert client.auth_client == auth_client_api_key
         assert client.BASE_URL == "https://traffic.api.here.com/v3"
         assert client.session is not None
+        assert client.session.headers["User-Agent"] == constants.DEFAULT_USER_AGENT
     
     def test_get_flow(self, auth_client_api_key, mock_flow_response, mock_requests_session):
         """Test get_flow method"""
@@ -55,8 +58,9 @@ class TestTrafficAPIv3:
         mock_requests_session.get.return_value = mock_response
         
         client = TrafficAPIv3(auth_client_api_key)
-        with pytest.raises(requests.HTTPError):
+        with pytest.raises(requests.HTTPError) as exc:
             client.get_flow()
+        assert isinstance(exc.value, HereTrafficHTTPError)
     
     def test_get_flow_with_oauth(self, auth_client_oauth, mock_flow_response, mock_oauth_token_response, mock_requests_session, mock_requests_post):
         """Test get_flow with OAuth authentication"""

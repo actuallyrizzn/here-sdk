@@ -8,6 +8,9 @@ from typing import Optional
 import requests
 from datetime import datetime, timedelta
 
+from . import constants
+from .exceptions import HereTrafficAuthError, raise_for_status_with_context
+
 
 class AuthMethod(Enum):
     """Authentication method enumeration"""
@@ -22,7 +25,7 @@ class AuthClient:
     Supports both API Key and OAuth 2.0 authentication methods.
     """
     
-    OAUTH_TOKEN_URL = "https://account.api.here.com/oauth2/token"
+    OAUTH_TOKEN_URL = constants.OAUTH_TOKEN_URL
     
     def __init__(
         self,
@@ -70,7 +73,9 @@ class AuthClient:
         """
         if self.auth_method == AuthMethod.API_KEY:
             if not self.api_key:
-                raise ValueError("API key is required for API key authentication")
+                raise HereTrafficAuthError(
+                    "HERE_TRAFFIC_SDK_AUTH_ERROR: API key is required for API key authentication"
+                )
             return {"apiKey": self.api_key}
         return {}
     
@@ -88,19 +93,26 @@ class AuthClient:
         
         # Request new token
         if not self.access_key_id or not self.access_key_secret:
-            raise ValueError("OAuth credentials (access_key_id and access_key_secret) are required for OAuth authentication")
+            raise HereTrafficAuthError(
+                "HERE_TRAFFIC_SDK_AUTH_ERROR: OAuth credentials (access_key_id and access_key_secret) are required for OAuth authentication"
+            )
         
         response = requests.post(
             self.OAUTH_TOKEN_URL,
             data={
                 "grant_type": "client_credentials",
                 "client_id": self.access_key_id,
-                "client_secret": self.access_key_secret
+                "client_secret": self.access_key_secret,
             },
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
+            headers={
+                "Content-Type": constants.CONTENT_TYPE_FORM_URLENCODED,
+                "User-Agent": constants.DEFAULT_USER_AGENT,
+            },
         )
-        
-        response.raise_for_status()
+
+        raise_for_status_with_context(
+            response=response, method="POST", url=self.OAUTH_TOKEN_URL, prefix="HERE_TRAFFIC_SDK_OAUTH_ERROR"
+        )
         token_data = response.json()
         
         self._oauth_token = token_data["access_token"]

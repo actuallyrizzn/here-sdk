@@ -7,6 +7,8 @@ from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timedelta
 import requests
 from here_traffic_sdk.auth import AuthClient, AuthMethod
+from here_traffic_sdk import constants
+from here_traffic_sdk.exceptions import HereTrafficHTTPError
 
 
 class TestAuthClient:
@@ -121,8 +123,9 @@ class TestAuthClient:
         mock_response.raise_for_status.side_effect = requests.HTTPError("401 Unauthorized")
         mock_requests_post.return_value = mock_response
         
-        with pytest.raises(requests.HTTPError):
+        with pytest.raises(requests.HTTPError) as exc:
             auth_client_oauth._get_oauth_token()
+        assert isinstance(exc.value, HereTrafficHTTPError)
     
     def test_refresh_token(self, auth_client_oauth, mock_oauth_token_response, mock_requests_post):
         """Test manually refreshing OAuth token"""
@@ -187,4 +190,5 @@ class TestAuthClient:
         assert call_args[1]["data"]["client_id"] == auth_client_oauth.access_key_id
         assert call_args[1]["data"]["client_secret"] == auth_client_oauth.access_key_secret
         assert call_args[1]["headers"]["Content-Type"] == "application/x-www-form-urlencoded"
+        assert call_args[1]["headers"]["User-Agent"] == constants.DEFAULT_USER_AGENT
 

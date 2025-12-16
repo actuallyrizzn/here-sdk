@@ -124,9 +124,17 @@ def mock_availability_response():
 @pytest.fixture
 def mock_requests_session():
     """Mock requests session"""
-    with patch('here_traffic_sdk.v7.requests.Session') as mock_session_class:
+    with (
+        patch("here_traffic_sdk.v7.requests.Session") as v7_session_class,
+        patch("here_traffic_sdk.v6.requests.Session") as v6_session_class,
+        patch("here_traffic_sdk.v3.requests.Session") as v3_session_class,
+    ):
         mock_session = MagicMock()
-        mock_session_class.return_value = mock_session
+        # Make headers behave like a dict for tests that assert values.
+        mock_session.headers = {}
+        v7_session_class.return_value = mock_session
+        v6_session_class.return_value = mock_session
+        v3_session_class.return_value = mock_session
         yield mock_session
 
 

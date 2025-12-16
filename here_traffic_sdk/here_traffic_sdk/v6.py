@@ -6,6 +6,8 @@ Legacy version maintained for backward compatibility
 from typing import Optional, Dict, Any
 import requests
 from .auth import AuthClient
+from . import constants
+from .exceptions import raise_for_status_with_context
 from .models import TrafficFlowResponse, TrafficIncidentResponse
 
 
@@ -17,7 +19,7 @@ class TrafficAPIv6:
     Maintained for backward compatibility.
     """
     
-    BASE_URL = "https://traffic.api.here.com/traffic/6.3"
+    BASE_URL = constants.BASE_URL_V6
     
     def __init__(self, auth_client: AuthClient):
         """
@@ -28,6 +30,8 @@ class TrafficAPIv6:
         """
         self.auth_client = auth_client
         self.session = requests.Session()
+        # Identify the SDK in outbound requests.
+        self.session.headers.update({"User-Agent": constants.DEFAULT_USER_AGENT})
     
     def get_flow(
         self,
@@ -61,7 +65,7 @@ class TrafficAPIv6:
             params=params,
             headers=headers
         )
-        response.raise_for_status()
+        raise_for_status_with_context(response=response, method="GET", url=f"{self.BASE_URL}/flow.json")
         
         return TrafficFlowResponse(data=response.json(), raw_response=response.json())
     
@@ -121,7 +125,7 @@ class TrafficAPIv6:
             params=params,
             headers=headers
         )
-        response.raise_for_status()
+        raise_for_status_with_context(response=response, method="GET", url=f"{self.BASE_URL}/incidents.json")
         
         return TrafficIncidentResponse(data=response.json(), raw_response=response.json())
     

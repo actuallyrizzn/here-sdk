@@ -33,7 +33,7 @@ from .models import (
     GeospatialFilter,
 )
 
-__version__ = "1.0.0"
+from ._version import __version__
 __all__ = [
     "HereTrafficClient",
     "AuthClient",

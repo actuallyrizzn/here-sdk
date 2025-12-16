@@ -6,6 +6,8 @@ import pytest
 from unittest.mock import Mock, patch
 import requests
 from here_traffic_sdk.v6 import TrafficAPIv6
+from here_traffic_sdk import constants
+from here_traffic_sdk.exceptions import HereTrafficHTTPError
 
 
 class TestTrafficAPIv6:
@@ -17,6 +19,7 @@ class TestTrafficAPIv6:
         assert client.auth_client == auth_client_api_key
         assert client.BASE_URL == "https://traffic.api.here.com/traffic/6.3"
         assert client.session is not None
+        assert client.session.headers["User-Agent"] == constants.DEFAULT_USER_AGENT
     
     def test_get_flow(self, auth_client_api_key, mock_flow_response, mock_requests_session):
         """Test get_flow method"""
@@ -55,8 +58,9 @@ class TestTrafficAPIv6:
         mock_requests_session.get.return_value = mock_response
         
         client = TrafficAPIv6(auth_client_api_key)
-        with pytest.raises(requests.HTTPError):
+        with pytest.raises(requests.HTTPError) as exc:
             client.get_flow("51.5,-0.13;51.51,-0.12")
+        assert isinstance(exc.value, HereTrafficHTTPError)
     
     def test_get_flow_bbox(self, auth_client_api_key, mock_flow_response, mock_requests_session):
         """Test get_flow_bbox convenience method"""

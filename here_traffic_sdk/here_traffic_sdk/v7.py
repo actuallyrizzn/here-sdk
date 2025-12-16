@@ -6,6 +6,8 @@ Current version of the Traffic API
 from typing import Optional, Dict, Any
 import requests
 from .auth import AuthClient
+from . import constants
+from .exceptions import raise_for_status_with_context
 from .models import (
     LocationReference,
     GeospatialFilter,
@@ -25,7 +27,7 @@ class TrafficAPIv7:
     - API availability information
     """
     
-    BASE_URL = "https://data.traffic.hereapi.com/v7"
+    BASE_URL = constants.BASE_URL_V7
     
     def __init__(self, auth_client: AuthClient):
         """
@@ -36,6 +38,8 @@ class TrafficAPIv7:
         """
         self.auth_client = auth_client
         self.session = requests.Session()
+        # Identify the SDK in outbound requests.
+        self.session.headers.update({"User-Agent": constants.DEFAULT_USER_AGENT})
     
     def get_flow(
         self,
@@ -73,7 +77,7 @@ class TrafficAPIv7:
             params=params,
             headers=headers
         )
-        response.raise_for_status()
+        raise_for_status_with_context(response=response, method="GET", url=f"{self.BASE_URL}/flow")
         
         return TrafficFlowResponse(data=response.json(), raw_response=response.json())
     
@@ -163,7 +167,7 @@ class TrafficAPIv7:
             params=params,
             headers=headers
         )
-        response.raise_for_status()
+        raise_for_status_with_context(response=response, method="GET", url=f"{self.BASE_URL}/incidents")
         
         return TrafficIncidentResponse(data=response.json(), raw_response=response.json())
     
@@ -239,7 +243,7 @@ class TrafficAPIv7:
             params=params,
             headers=headers
         )
-        response.raise_for_status()
+        raise_for_status_with_context(response=response, method="GET", url=f"{self.BASE_URL}/availability")
         
         return AvailabilityResponse(data=response.json(), raw_response=response.json())
 
